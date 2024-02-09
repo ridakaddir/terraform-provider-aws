@@ -458,6 +458,19 @@ func ResourceTarget() *schema.Resource {
 					},
 				},
 			},
+			"appsync_target": {
+				Type:     schema.TypeList,
+				Optional: true,
+				MaxItems: 1,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"graph_ql_operation": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+					},
+				},
+			},
 			"target_id": {
 				Type:         schema.TypeString,
 				Optional:     true,
@@ -580,6 +593,12 @@ func resourceTargetRead(ctx context.Context, d *schema.ResourceData, meta interf
 	if t.SqsParameters != nil {
 		if err := d.Set("sqs_target", flattenTargetSQSParameters(t.SqsParameters)); err != nil {
 			return sdkdiag.AppendErrorf(diags, "setting sqs_target: %s", err)
+		}
+	}
+
+	if t.AppSyncParameters != nil {
+		if err := d.Set("appsync_target", flattenTargetAppSyncParameters(t.AppSyncParameters)); err != nil {
+			return diag.Errorf("setting appsync_parameters: %s", err)
 		}
 	}
 
@@ -740,6 +759,10 @@ func buildPutTargetInputStruct(ctx context.Context, d *schema.ResourceData) *eve
 
 	if v, ok := d.GetOk("sqs_target"); ok && len(v.([]interface{})) > 0 && v.([]interface{})[0] != nil {
 		e.SqsParameters = expandTargetSQSParameters(v.([]interface{}))
+	}
+
+	if v, ok := d.GetOk("appsync_target"); ok && len(v.([]interface{})) > 0 && v.([]interface{})[0] != nil {
+		e.AppSyncParameters = expandTargetAppSyncParameters(v.([]interface{}))
 	}
 
 	if v, ok := d.GetOk("sagemaker_pipeline_target"); ok && len(v.([]interface{})) > 0 && v.([]interface{})[0] != nil {
@@ -963,6 +986,18 @@ func expandTargetSQSParameters(config []interface{}) *eventbridge.SqsParameters 
 	return sqsParameters
 }
 
+func expandTargetAppSyncParameters(config []interface{}) *eventbridge.AppSyncParameters {
+	appSyncParameters := &eventbridge.AppSyncParameters{}
+	for _, c := range config {
+		param := c.(map[string]interface{})
+		if v, ok := param["graph_ql_operation"].(string); ok && v != "" {
+			appSyncParameters.GraphQLOperation = aws.String(v)
+		}
+	}
+
+	return appSyncParameters
+}
+
 func expandTargetSageMakerPipelineParameterList(tfList []interface{}) []*eventbridge.SageMakerPipelineParameter {
 	if len(tfList) == 0 {
 		return nil
@@ -1181,6 +1216,13 @@ func flattenTargetSageMakerPipelineParameter(pcs []*eventbridge.SageMakerPipelin
 func flattenTargetSQSParameters(sqsParameters *eventbridge.SqsParameters) []map[string]interface{} {
 	config := make(map[string]interface{})
 	config["message_group_id"] = aws.StringValue(sqsParameters.MessageGroupId)
+	result := []map[string]interface{}{config}
+	return result
+}
+
+func flattenTargetAppSyncParameters(appSyncParameters *eventbridge.AppSyncParameters) []map[string]interface{} {
+	config := make(map[string]interface{})
+	config["graph_ql_operation"] = aws.StringValue(appSyncParameters.GraphQLOperation)
 	result := []map[string]interface{}{config}
 	return result
 }
